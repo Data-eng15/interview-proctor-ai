@@ -44,4 +44,5 @@ export class VoiceMeter {
   }
 }
 
-export const VOICE_THRESHOLD = 0.06;
+// Raised from 0.06 so fans/typing/room hum don't register as "speech".
+export const VOICE_THRESHOLD = 0.14;

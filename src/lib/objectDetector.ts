@@ -14,7 +14,9 @@ export const WATCHED = new Set([
   "person",
 ]);
 
-const MIN_SCORE = 0.5;
+// Raised from 0.5 to cut low-confidence misdetections (dark rectangles read as
+// phones, patterns read as books). Combined with two-cycle confirmation upstream.
+const MIN_SCORE = 0.6;
 
 export async function createObjectDetector(): Promise<ObjectDetector> {
   return cocoSsd.load({ base: "lite_mobilenet_v2" });

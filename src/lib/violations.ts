@@ -1,36 +1,40 @@
 import type { ViolationMeta, ViolationType } from "./types";
 
+// `debounce` = consecutive detection frames (~30/s) a condition must persist
+// before it is logged. Tuned conservatively to avoid false flags. Object-based
+// conditions (phone/book/person) additionally require two-cycle confirmation in
+// the detection loop, so their frame debounce can stay small.
 export const VIOLATIONS: Record<ViolationType, ViolationMeta> = {
   MULTIPLE_FACES: {
     label: "Multiple faces",
     severity: "critical",
-    weight: 25,
+    weight: 20,
     icon: "👥",
-    debounce: 6,
+    debounce: 25,
     description: "More than one face detected — possible impersonation help.",
   },
   PHONE_DETECTED: {
     label: "Phone in frame",
     severity: "critical",
-    weight: 20,
+    weight: 18,
     icon: "📱",
-    debounce: 2,
+    debounce: 4,
     description: "A mobile phone was detected in the camera view.",
   },
   EXTRA_PERSON: {
     label: "Extra person",
     severity: "critical",
-    weight: 20,
+    weight: 18,
     icon: "🧍",
-    debounce: 3,
+    debounce: 4,
     description: "A second person was detected in the room.",
   },
   NO_FACE: {
     label: "Candidate absent",
     severity: "high",
-    weight: 10,
+    weight: 8,
     icon: "🚫",
-    debounce: 12,
+    debounce: 45,
     description: "No face detected — the candidate left the frame.",
   },
   TAB_SWITCH: {
@@ -44,33 +48,33 @@ export const VIOLATIONS: Record<ViolationType, ViolationMeta> = {
   BOOK_DETECTED: {
     label: "Book / notes",
     severity: "medium",
-    weight: 8,
+    weight: 6,
     icon: "📖",
-    debounce: 3,
+    debounce: 5,
     description: "A book or notes were detected in the frame.",
   },
   LIP_SYNC_MISMATCH: {
     label: "Lip-sync mismatch",
     severity: "medium",
-    weight: 8,
+    weight: 4,
     icon: "🗣️",
-    debounce: 4,
+    debounce: 55,
     description: "Speech was heard but the candidate's lips were not moving.",
   },
   LOOKING_AWAY: {
     label: "Looking away",
     severity: "medium",
-    weight: 5,
+    weight: 3,
     icon: "👀",
-    debounce: 10,
+    debounce: 90,
     description: "Gaze directed away from the screen for a sustained period.",
   },
   BACKGROUND_VOICE: {
     label: "Background voice",
     severity: "low",
-    weight: 4,
+    weight: 3,
     icon: "🔊",
-    debounce: 6,
+    debounce: 50,
     description: "Sustained speech while the candidate's mouth was closed.",
   },
   FULLSCREEN_EXIT: {

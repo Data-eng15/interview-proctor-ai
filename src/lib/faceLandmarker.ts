@@ -56,7 +56,9 @@ export function estimateGaze(result: FaceLandmarkerResult): Gaze {
   ];
   entries.sort((a, b) => b[1] - a[1]);
   const [dir, val] = entries[0];
-  return val > 0.9 ? dir : "center";
+  // Each direction sums two blendshapes (0..2). Require a strong, deliberate
+  // look-away before reporting a direction; natural glances stay "center".
+  return val > 1.3 ? dir : "center";
 }
 
 export { FaceLandmarker };

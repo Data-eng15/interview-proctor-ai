@@ -63,6 +63,10 @@ export function useProctor() {
 
   const metricsRef = useRef<LiveMetrics>(EMPTY_METRICS);
   const objectsRef = useRef<Detection[]>([]);
+  // two-cycle confirmation so a single bad object-detection frame can't flag
+  const prevClasses = useRef<Set<string>>(new Set());
+  const prevPersonCount = useRef(0);
+  const objSignals = useRef({ phone: false, book: false, extraPerson: false });
   const jawWindow = useRef<number[]>([]);
   const voiceWindow = useRef<boolean[]>([]);
   const debouncer = useRef(new Debouncer());
@@ -76,7 +80,7 @@ export function useProctor() {
   const logEvent = useCallback((type: ViolationType, detail?: string) => {
     const now = performance.now();
     const last = cooldown.current.get(type) ?? 0;
-    if (now - last < 800) return; // dedupe rapid repeats
+    if (now - last < 4000) return; // don't drain the score on a recurring flag
     cooldown.current.set(type, now);
 
     const ev: ProctorEvent = {
@@ -113,12 +117,14 @@ export function useProctor() {
     const jw = jawWindow.current;
     jw.push(jawOpen);
     if (jw.length > 24) jw.shift();
+    // lenient movement detection → speaking is readily counted as "moving",
+    // which minimises false lip-sync-mismatch flags
     const mouthMoving =
-      Math.max(...jw) - Math.min(...jw) > 0.06 || Math.max(...jw) > 0.25;
+      Math.max(...jw) - Math.min(...jw) > 0.04 || Math.max(...jw) > 0.18;
 
     const vw = voiceWindow.current;
     const voiceSustained =
-      vw.length > 0 && vw.filter(Boolean).length / vw.length > 0.4;
+      vw.length >= 8 && vw.filter(Boolean).length / vw.length > 0.6;
 
     // fps
     const fs = frameStamps.current;
@@ -127,13 +133,11 @@ export function useProctor() {
 
     const objects = objectsRef.current;
     const personCount = objects.filter((o) => o.class === "person").length;
-    const hasPhone = objects.some((o) => o.class === "cell phone");
-    const hasBook = objects.some((o) => o.class === "book");
+    const sig = objSignals.current; // two-cycle-confirmed object signals
 
-    // draw overlay
+    // draw overlay (visual alert reserved for serious, stable conditions)
     const ctx = canvas.getContext("2d");
-    const anyAlert =
-      faceCount !== 1 || hasPhone || personCount >= 2 || gaze !== "center";
+    const anyAlert = faceCount !== 1 || sig.phone || sig.extraPerson;
     if (ctx) drawOverlay(ctx, result, objects, anyAlert);
 
     // evaluate per-tick violation conditions
@@ -142,11 +146,11 @@ export function useProctor() {
       MULTIPLE_FACES: faceCount >= 2,
       LOOKING_AWAY:
         faceCount === 1 && gaze !== "center" && gaze !== "unknown",
-      LIP_SYNC_MISMATCH: faceCount >= 1 && voiceSustained && !mouthMoving,
+      LIP_SYNC_MISMATCH: faceCount === 1 && voiceSustained && !mouthMoving,
       BACKGROUND_VOICE: faceCount === 0 && voiceSustained,
-      PHONE_DETECTED: hasPhone,
-      BOOK_DETECTED: hasBook,
-      EXTRA_PERSON: personCount >= 2,
+      PHONE_DETECTED: sig.phone,
+      BOOK_DETECTED: sig.book,
+      EXTRA_PERSON: sig.extraPerson,
     });
     fired.forEach((t) => logEvent(t));
 
@@ -210,6 +214,9 @@ export function useProctor() {
     voiceWindow.current = [];
     cooldown.current.clear();
     objectsRef.current = [];
+    prevClasses.current = new Set();
+    prevPersonCount.current = 0;
+    objSignals.current = { phone: false, book: false, extraPerson: false };
     metricsRef.current = EMPTY_METRICS;
 
     try {
@@ -253,7 +260,19 @@ export function useProctor() {
         if (!d || !v || objBusy.current) return;
         objBusy.current = true;
         try {
-          objectsRef.current = await detectObjects(d, v);
+          const dets = await detectObjects(d, v);
+          objectsRef.current = dets;
+
+          // confirm only objects seen in TWO consecutive detection cycles
+          const curr = new Set(dets.map((o) => o.class));
+          const personNow = dets.filter((o) => o.class === "person").length;
+          objSignals.current = {
+            phone: curr.has("cell phone") && prevClasses.current.has("cell phone"),
+            book: curr.has("book") && prevClasses.current.has("book"),
+            extraPerson: personNow >= 2 && prevPersonCount.current >= 2,
+          };
+          prevClasses.current = curr;
+          prevPersonCount.current = personNow;
         } catch {
           /* skip frame */
         } finally {
