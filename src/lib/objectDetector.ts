@@ -19,8 +19,8 @@ export const WATCHED = new Set([
 // people use a higher bar to avoid false positives. A phone is sometimes
 // mislabelled "remote", so that is treated leniently too.
 const THRESHOLDS: Record<string, number> = {
-  "cell phone": 0.35,
-  remote: 0.4,
+  "cell phone": 0.3,
+  remote: 0.35,
   laptop: 0.5,
   tv: 0.5,
   book: 0.5,
@@ -29,7 +29,10 @@ const THRESHOLDS: Record<string, number> = {
 const DEFAULT_MIN = 0.6;
 
 export async function createObjectDetector(): Promise<ObjectDetector> {
-  return cocoSsd.load({ base: "lite_mobilenet_v2" });
+  // Full mobilenet_v2 (not lite) — meaningfully better at detecting phones held
+  // at angles / back-first, which the lite model frequently misses. Object
+  // detection runs only ~1.5x/sec so the extra cost is affordable.
+  return cocoSsd.load({ base: "mobilenet_v2" });
 }
 
 export async function detectObjects(
