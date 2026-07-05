@@ -38,7 +38,8 @@ const EMPTY_METRICS: LiveMetrics = {
 // Head-pose baseline calibration + off-screen thresholds.
 const CALIB_MS = 2000; // capture neutral pose over the first 2s
 const YAW_TH = 0.13; // horizontal deviation from baseline to count as "away"
-const PITCH_TH = 0.1; // vertical deviation from baseline to count as up/down
+const PITCH_TH = 0.1; // vertical head-tilt deviation from baseline
+const EYE_TH = 0.22; // eyes-down deviation (catches head-level phone glances)
 
 function emptyCounts(): Record<ViolationType, number> {
   const c = {} as Record<ViolationType, number>;
@@ -79,8 +80,10 @@ export function useProctor() {
   const baseline = useRef({
     yaw: 0,
     pitch: 0,
+    eye: 0,
     yawSum: 0,
     pitchSum: 0,
+    eyeSum: 0,
     n: 0,
     ready: false,
   });
@@ -141,21 +144,29 @@ export function useProctor() {
       if (elapsed < CALIB_MS) {
         base.yawSum += hf.yaw;
         base.pitchSum += hf.pitch;
+        base.eyeSum += hf.eyeDown;
         base.n += 1;
       } else {
         if (!base.ready) {
           if (base.n > 0) {
             base.yaw = base.yawSum / base.n;
             base.pitch = base.pitchSum / base.n;
+            base.eye = base.eyeSum / base.n;
           } else {
             base.yaw = hf.yaw;
             base.pitch = hf.pitch;
+            base.eye = hf.eyeDown;
           }
           base.ready = true;
         }
         const dYaw = hf.yaw - base.yaw;
         const dPitch = hf.pitch - base.pitch;
-        if (Math.abs(dPitch) > PITCH_TH && Math.abs(dPitch) >= Math.abs(dYaw)) {
+        const dEyeDown = hf.eyeDown - base.eye;
+        // eyes-down is unambiguous, so it wins the "down" call; otherwise fall
+        // back to head tilt, then to left/right turn.
+        if (dEyeDown > EYE_TH) {
+          gaze = "down";
+        } else if (Math.abs(dPitch) > PITCH_TH && Math.abs(dPitch) >= Math.abs(dYaw)) {
           gaze = dPitch > 0 ? "down" : "up";
         } else if (Math.abs(dYaw) > YAW_TH) {
           gaze = dYaw > 0 ? "right" : "left";
@@ -270,7 +281,11 @@ export function useProctor() {
     classHistory.current = [];
     personHistory.current = [];
     objSignals.current = { phone: false, book: false, extraPerson: false };
-    baseline.current = { yaw: 0, pitch: 0, yawSum: 0, pitchSum: 0, n: 0, ready: false };
+    baseline.current = {
+      yaw: 0, pitch: 0, eye: 0,
+      yawSum: 0, pitchSum: 0, eyeSum: 0,
+      n: 0, ready: false,
+    };
     metricsRef.current = EMPTY_METRICS;
 
     try {

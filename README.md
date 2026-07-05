@@ -90,6 +90,17 @@ The Vite `base` path is already set to `/interview-proctor-ai/` for production.
 
 ---
 
+## ⚖️ Limitations (by design)
+
+No webcam-only system can be a perfect anti-cheat, and ProctorAI is honest about that:
+
+- **A phone fully out of frame** can only be inferred behaviorally — via sustained
+  **looking-down** (head tilt *or* eyes-down, both calibrated per session). A device
+  used with essentially no eye/head movement is undetectable by any single webcam.
+- Real deployments layer additional controls this demo intentionally omits:
+  lockdown browser, a second (phone) camera, ID/liveness verification, and human
+  review. Automated flags here are **signals, not verdicts.**
+
 ## 🔒 Privacy
 
 ProctorAI is a **technical demonstration**. All inference happens on-device; no

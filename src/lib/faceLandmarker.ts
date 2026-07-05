@@ -42,7 +42,7 @@ export type Gaze = "center" | "left" | "right" | "up" | "down" | "unknown";
  */
 export function headFeatures(
   result: FaceLandmarkerResult
-): { yaw: number; pitch: number } | null {
+): { yaw: number; pitch: number; eyeDown: number } | null {
   const lm = result.faceLandmarks?.[0];
   if (!lm) return null;
   const nose = lm[1];
@@ -59,7 +59,14 @@ export function headFeatures(
   const faceH = Math.abs(chin.y - brow.y) || 1e-6;
   const pitch = (nose.y - brow.y) / faceH;
 
-  return { yaw, pitch };
+  // eyes-down: catches looking down at a low/out-of-frame phone even when the
+  // head stays level. Unambiguously signed (0 = level, 1 = fully down).
+  const eyeDown =
+    (blendshape(result, "eyeLookDownLeft") +
+      blendshape(result, "eyeLookDownRight")) /
+    2;
+
+  return { yaw, pitch, eyeDown };
 }
 
 export { FaceLandmarker };
