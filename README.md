@@ -14,6 +14,19 @@ The paper proposes lip-sync detection, voice recognition, face detection and env
 
 ---
 
+## 👥 Two roles, one session
+
+Proctoring is inherently a two-sided system, and the app models that:
+
+- **Candidate view** — a mock interview (questions, timer, self-view). Proctoring
+  runs **silently**; the candidate never sees flags, scores, or a report.
+- **Proctor view** — the interviewer's dashboard: live monitor feed with overlay,
+  status tiles, flag log, integrity score, and the exportable report.
+
+In the demo you can toggle between the two (top-right) to see both sides of the
+same live session. In a real deployment they'd run on separate machines, sharing
+data through a backend — the candidate's screen would only ever be the interview.
+
 ## ✨ What it does
 
 | Signal | How | Paper feature |

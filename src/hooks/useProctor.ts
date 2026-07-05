@@ -49,6 +49,7 @@ function emptyCounts(): Record<ViolationType, number> {
 
 export function useProctor() {
   const [status, setStatus] = useState<ProctorStatus>("idle");
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [metrics, setMetrics] = useState<LiveMetrics>(EMPTY_METRICS);
   const [events, setEvents] = useState<ProctorEvent[]>([]);
   const [score, setScore] = useState(100);
@@ -120,9 +121,10 @@ export function useProctor() {
 
   const detectLoop = useCallback(() => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
     const landmarker = landmarkerRef.current;
-    if (!video || !canvas || !landmarker || video.readyState < 2) {
+    // Detection runs off the video only — the overlay canvas is optional, so
+    // proctoring keeps running even when the proctor dashboard isn't visible.
+    if (!video || !landmarker || video.readyState < 2) {
       rafRef.current = requestAnimationFrame(detectLoop);
       return;
     }
@@ -199,10 +201,17 @@ export function useProctor() {
     const personCount = objects.filter((o) => o.class === "person").length;
     const sig = objSignals.current; // two-cycle-confirmed object signals
 
-    // draw overlay (visual alert reserved for serious, stable conditions)
-    const ctx = canvas.getContext("2d");
-    const anyAlert = faceCount !== 1 || sig.phone || sig.extraPerson;
-    if (ctx) drawOverlay(ctx, result, objects, anyAlert);
+    // draw overlay only if the proctor canvas is mounted (dashboard visible)
+    const canvas = canvasRef.current;
+    if (canvas) {
+      if (!canvas.width || !canvas.height) {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+      }
+      const ctx = canvas.getContext("2d");
+      const anyAlert = faceCount !== 1 || sig.phone || sig.extraPerson;
+      if (ctx) drawOverlay(ctx, result, objects, anyAlert);
+    }
 
     // evaluate per-tick violation conditions
     const fired = debouncer.current.update({
@@ -238,6 +247,7 @@ export function useProctor() {
     window.clearInterval(audioTimerRef.current);
     window.clearInterval(flushTimerRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    setStream(null);
     voiceRef.current?.close();
     try {
       landmarkerRef.current?.close();
@@ -295,6 +305,7 @@ export function useProctor() {
         audio: true,
       });
       streamRef.current = stream;
+      setStream(stream);
 
       setStatus("loading");
       setLoadingMsg("Loading face-mesh and object-detection models…");
@@ -314,10 +325,6 @@ export function useProctor() {
         if (video.readyState >= 2) return res();
         video.onloadeddata = () => res();
       });
-
-      const canvas = canvasRef.current!;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
 
       startTime.current = performance.now();
       setStatus("running");
@@ -406,6 +413,7 @@ export function useProctor() {
 
   return {
     status,
+    stream,
     metrics,
     events,
     score,

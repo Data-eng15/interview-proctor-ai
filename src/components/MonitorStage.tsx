@@ -1,16 +1,17 @@
 import type { RefObject } from "react";
 import type { LiveMetrics, ProctorStatus } from "../lib/types";
+import StreamVideo from "./StreamVideo";
 
 interface Props {
-  videoRef: RefObject<HTMLVideoElement>;
+  stream: MediaStream | null;
   canvasRef: RefObject<HTMLCanvasElement>;
   status: ProctorStatus;
   metrics: LiveMetrics;
   loadingMsg: string;
 }
 
-export default function VideoStage({
-  videoRef,
+export default function MonitorStage({
+  stream,
   canvasRef,
   status,
   metrics,
@@ -28,21 +29,15 @@ export default function VideoStage({
         alert ? "border-danger/70" : "border-edge"
       }`}
     >
-      {/* mirrored wrapper so video + overlay align in selfie view */}
+      {/* mirrored wrapper so the monitor feed + overlay align in selfie view */}
       <div className="absolute inset-0 [transform:scaleX(-1)]">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="h-full w-full object-cover"
-        />
+        <StreamVideo stream={stream} className="h-full w-full object-cover" />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 h-full w-full object-cover"
         />
       </div>
 
-      {/* REC badge */}
       {status === "running" && (
         <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 backdrop-blur">
           <span className="h-2 w-2 animate-pulse-dot rounded-full bg-danger" />
@@ -60,7 +55,7 @@ export default function VideoStage({
 
       {status === "running" && metrics.calibrating && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] font-medium text-brand-soft backdrop-blur">
-          Calibrating head pose — look at the screen…
+          Calibrating head pose — candidate looking at screen…
         </div>
       )}
 

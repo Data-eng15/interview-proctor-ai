@@ -30,7 +30,7 @@ export default function LandingScreen({ onStart }: { onStart: () => void }) {
             onClick={onStart}
             className="rounded-xl bg-gradient-to-r from-brand to-brand-soft px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition hover:brightness-110"
           >
-            ▶ Start proctoring session
+            ▶ Start mock interview
           </button>
           <a
             href="https://github.com/Data-eng15/interview-proctor-ai"
@@ -41,8 +41,12 @@ export default function LandingScreen({ onStart }: { onStart: () => void }) {
             View code
           </a>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Grants camera &amp; microphone access. Works best in Chrome / Edge.
+        <p className="animate-fade-up mx-auto mt-4 max-w-xl text-xs text-slate-500">
+          You'll take a short mock interview — this is the <strong>candidate</strong>{" "}
+          view, with proctoring running silently. Flip to the{" "}
+          <strong>Proctor</strong> view any time (top-right) to see the
+          interviewer's live dashboard. Grants camera &amp; mic; works best in
+          Chrome / Edge.
         </p>
       </div>
 
