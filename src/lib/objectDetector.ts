@@ -14,9 +14,19 @@ export const WATCHED = new Set([
   "person",
 ]);
 
-// Raised from 0.5 to cut low-confidence misdetections (dark rectangles read as
-// phones, patterns read as books). Combined with two-cycle confirmation upstream.
-const MIN_SCORE = 0.6;
+// Per-class confidence. Phones matter most and are often only partially visible
+// (held at an angle, half-occluded by a hand), so they get a low bar; books/
+// people use a higher bar to avoid false positives. A phone is sometimes
+// mislabelled "remote", so that is treated leniently too.
+const THRESHOLDS: Record<string, number> = {
+  "cell phone": 0.35,
+  remote: 0.4,
+  laptop: 0.5,
+  tv: 0.5,
+  book: 0.5,
+  person: 0.6,
+};
+const DEFAULT_MIN = 0.6;
 
 export async function createObjectDetector(): Promise<ObjectDetector> {
   return cocoSsd.load({ base: "lite_mobilenet_v2" });
@@ -26,6 +36,9 @@ export async function detectObjects(
   detector: ObjectDetector,
   video: HTMLVideoElement
 ): Promise<Detection[]> {
-  const preds = await detector.detect(video, 8);
-  return preds.filter((p) => p.score >= MIN_SCORE && WATCHED.has(p.class));
+  const preds = await detector.detect(video, 12);
+  return preds
+    .filter((p) => WATCHED.has(p.class) && p.score >= (THRESHOLDS[p.class] ?? DEFAULT_MIN))
+    // treat a "remote" detection as a phone — COCO often confuses the two
+    .map((p) => (p.class === "remote" ? { ...p, class: "cell phone" } : p));
 }

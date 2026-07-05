@@ -63,9 +63,11 @@ export function useProctor() {
 
   const metricsRef = useRef<LiveMetrics>(EMPTY_METRICS);
   const objectsRef = useRef<Detection[]>([]);
-  // two-cycle confirmation so a single bad object-detection frame can't flag
-  const prevClasses = useRef<Set<string>>(new Set());
-  const prevPersonCount = useRef(0);
+  // rolling-window confirmation: an object must appear in >=2 of the last 4
+  // scans to flag — robust to single-frame blips, sensitive to intermittent
+  // detections (e.g. a phone held at an angle that flickers in and out).
+  const classHistory = useRef<Set<string>[]>([]);
+  const personHistory = useRef<number[]>([]);
   const objSignals = useRef({ phone: false, book: false, extraPerson: false });
   const jawWindow = useRef<number[]>([]);
   const voiceWindow = useRef<boolean[]>([]);
@@ -214,8 +216,8 @@ export function useProctor() {
     voiceWindow.current = [];
     cooldown.current.clear();
     objectsRef.current = [];
-    prevClasses.current = new Set();
-    prevPersonCount.current = 0;
+    classHistory.current = [];
+    personHistory.current = [];
     objSignals.current = { phone: false, book: false, extraPerson: false };
     metricsRef.current = EMPTY_METRICS;
 
@@ -263,22 +265,27 @@ export function useProctor() {
           const dets = await detectObjects(d, v);
           objectsRef.current = dets;
 
-          // confirm only objects seen in TWO consecutive detection cycles
+          // push into rolling 4-scan history, then confirm on >=2 hits
           const curr = new Set(dets.map((o) => o.class));
           const personNow = dets.filter((o) => o.class === "person").length;
+          const ch = classHistory.current;
+          ch.push(curr);
+          if (ch.length > 4) ch.shift();
+          const ph = personHistory.current;
+          ph.push(personNow);
+          if (ph.length > 4) ph.shift();
+          const seen = (cls: string) => ch.filter((s) => s.has(cls)).length;
           objSignals.current = {
-            phone: curr.has("cell phone") && prevClasses.current.has("cell phone"),
-            book: curr.has("book") && prevClasses.current.has("book"),
-            extraPerson: personNow >= 2 && prevPersonCount.current >= 2,
+            phone: seen("cell phone") >= 2,
+            book: seen("book") >= 2,
+            extraPerson: ph.filter((c) => c >= 2).length >= 2,
           };
-          prevClasses.current = curr;
-          prevPersonCount.current = personNow;
         } catch {
           /* skip frame */
         } finally {
           objBusy.current = false;
         }
-      }, 1100);
+      }, 650);
 
       // audio meter ~180ms
       audioTimerRef.current = window.setInterval(() => {
