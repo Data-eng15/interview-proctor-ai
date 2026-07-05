@@ -58,6 +58,12 @@ export default function VideoStage({
         </div>
       )}
 
+      {status === "running" && metrics.calibrating && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] font-medium text-brand-soft backdrop-blur">
+          Calibrating head pose — look at the screen…
+        </div>
+      )}
+
       {(status === "loading" || status === "requesting") && (
         <div className="absolute inset-0 grid place-items-center bg-black/70 backdrop-blur">
           <div className="flex flex-col items-center gap-3 text-center">

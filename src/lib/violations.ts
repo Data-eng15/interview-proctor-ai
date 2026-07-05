@@ -62,12 +62,13 @@ export const VIOLATIONS: Record<ViolationType, ViolationMeta> = {
     description: "Speech was heard but the candidate's lips were not moving.",
   },
   LOOKING_AWAY: {
-    label: "Looking away",
+    label: "Looking away / off-screen",
     severity: "medium",
-    weight: 3,
+    weight: 5,
     icon: "👀",
-    debounce: 90,
-    description: "Gaze directed away from the screen for a sustained period.",
+    debounce: 80,
+    description:
+      "Head turned away or looking down for a sustained period — possible phone or notes use.",
   },
   BACKGROUND_VOICE: {
     label: "Background voice",

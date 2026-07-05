@@ -39,6 +39,7 @@ export interface LiveMetrics {
   objects: string[]; // detected COCO labels of interest
   personCount: number;
   fps: number;
+  calibrating: boolean; // capturing neutral head-pose baseline
 }
 
 export type ProctorStatus =

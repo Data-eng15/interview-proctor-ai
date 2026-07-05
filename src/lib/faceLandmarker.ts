@@ -34,31 +34,32 @@ export function blendshape(
 export type Gaze = "center" | "left" | "right" | "up" | "down" | "unknown";
 
 /**
- * Estimate gaze direction from eye-look blendshapes. Returns the dominant
- * direction if it clearly exceeds a threshold, else "center".
+ * Scale-invariant head-orientation features from face-mesh geometry.
+ *  - `yaw`   : horizontal nose offset between the cheeks (turning left/right)
+ *  - `pitch` : vertical nose position between brow and chin (tilting up/down)
+ * Both are ratios normalized by face size, so they're independent of distance.
+ * Compared against a per-session baseline to detect looking away / down.
  */
-export function estimateGaze(result: FaceLandmarkerResult): Gaze {
-  if (!result.faceBlendshapes?.[0]) return "unknown";
-  const left = blendshape(result, "eyeLookOutLeft") +
-    blendshape(result, "eyeLookInRight");
-  const right = blendshape(result, "eyeLookOutRight") +
-    blendshape(result, "eyeLookInLeft");
-  const up = blendshape(result, "eyeLookUpLeft") +
-    blendshape(result, "eyeLookUpRight");
-  const down = blendshape(result, "eyeLookDownLeft") +
-    blendshape(result, "eyeLookDownRight");
+export function headFeatures(
+  result: FaceLandmarkerResult
+): { yaw: number; pitch: number } | null {
+  const lm = result.faceLandmarks?.[0];
+  if (!lm) return null;
+  const nose = lm[1];
+  const right = lm[234];
+  const left = lm[454];
+  const brow = lm[168];
+  const chin = lm[152];
+  if (!nose || !right || !left || !brow || !chin) return null;
 
-  const entries: [Gaze, number][] = [
-    ["left", left],
-    ["right", right],
-    ["up", up],
-    ["down", down],
-  ];
-  entries.sort((a, b) => b[1] - a[1]);
-  const [dir, val] = entries[0];
-  // Each direction sums two blendshapes (0..2). Require a strong, deliberate
-  // look-away before reporting a direction; natural glances stay "center".
-  return val > 1.3 ? dir : "center";
+  const faceW = Math.abs(left.x - right.x) || 1e-6;
+  const midX = (left.x + right.x) / 2;
+  const yaw = (nose.x - midX) / faceW;
+
+  const faceH = Math.abs(chin.y - brow.y) || 1e-6;
+  const pitch = (nose.y - brow.y) / faceH;
+
+  return { yaw, pitch };
 }
 
 export { FaceLandmarker };

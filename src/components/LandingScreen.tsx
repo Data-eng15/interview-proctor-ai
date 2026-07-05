@@ -1,6 +1,6 @@
 const FEATURES = [
   { icon: "🙂", title: "Face & identity", body: "Confirms one candidate is present; flags absence or multiple faces (impersonation)." },
-  { icon: "👀", title: "Gaze tracking", body: "Estimates head/eye direction to catch sustained looking-away." },
+  { icon: "👀", title: "Attention tracking", body: "Self-calibrating head-pose analysis flags sustained looking-away or looking-down (possible phone/notes)." },
   { icon: "📱", title: "Environment scan", body: "Detects phones, books and extra people in the camera view." },
   { icon: "🗣️", title: "Voice & lip-sync", body: "Listens for speech and checks it against lip movement." },
   { icon: "🗔", title: "Focus monitor", body: "Flags tab switches, window blur and fullscreen exits." },

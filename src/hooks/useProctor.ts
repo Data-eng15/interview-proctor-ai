@@ -3,7 +3,8 @@ import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import {
   createFaceLandmarker,
   blendshape,
-  estimateGaze,
+  headFeatures,
+  type Gaze,
 } from "../lib/faceLandmarker";
 import {
   createObjectDetector,
@@ -31,7 +32,13 @@ const EMPTY_METRICS: LiveMetrics = {
   objects: [],
   personCount: 0,
   fps: 0,
+  calibrating: false,
 };
+
+// Head-pose baseline calibration + off-screen thresholds.
+const CALIB_MS = 2000; // capture neutral pose over the first 2s
+const YAW_TH = 0.13; // horizontal deviation from baseline to count as "away"
+const PITCH_TH = 0.1; // vertical deviation from baseline to count as up/down
 
 function emptyCounts(): Record<ViolationType, number> {
   const c = {} as Record<ViolationType, number>;
@@ -69,6 +76,14 @@ export function useProctor() {
   const classHistory = useRef<Set<string>[]>([]);
   const personHistory = useRef<number[]>([]);
   const objSignals = useRef({ phone: false, book: false, extraPerson: false });
+  const baseline = useRef({
+    yaw: 0,
+    pitch: 0,
+    yawSum: 0,
+    pitchSum: 0,
+    n: 0,
+    ready: false,
+  });
   const jawWindow = useRef<number[]>([]);
   const voiceWindow = useRef<boolean[]>([]);
   const debouncer = useRef(new Debouncer());
@@ -113,7 +128,43 @@ export function useProctor() {
     const result = landmarker.detectForVideo(video, now);
     const faceCount = result.faceLandmarks?.length ?? 0;
     const jawOpen = blendshape(result, "jawOpen");
-    const gaze = estimateGaze(result);
+
+    // --- head-pose attention (self-calibrating) ---
+    const elapsed = now - startTime.current;
+    const hf = faceCount === 1 ? headFeatures(result) : null;
+    const base = baseline.current;
+    let gaze: Gaze = "unknown";
+    let offScreen = false;
+    const calibrating = hf != null && elapsed < CALIB_MS;
+
+    if (hf) {
+      if (elapsed < CALIB_MS) {
+        base.yawSum += hf.yaw;
+        base.pitchSum += hf.pitch;
+        base.n += 1;
+      } else {
+        if (!base.ready) {
+          if (base.n > 0) {
+            base.yaw = base.yawSum / base.n;
+            base.pitch = base.pitchSum / base.n;
+          } else {
+            base.yaw = hf.yaw;
+            base.pitch = hf.pitch;
+          }
+          base.ready = true;
+        }
+        const dYaw = hf.yaw - base.yaw;
+        const dPitch = hf.pitch - base.pitch;
+        if (Math.abs(dPitch) > PITCH_TH && Math.abs(dPitch) >= Math.abs(dYaw)) {
+          gaze = dPitch > 0 ? "down" : "up";
+        } else if (Math.abs(dYaw) > YAW_TH) {
+          gaze = dYaw > 0 ? "right" : "left";
+        } else {
+          gaze = "center";
+        }
+        offScreen = gaze !== "center";
+      }
+    }
 
     // rolling windows for lip-sync analysis
     const jw = jawWindow.current;
@@ -146,8 +197,7 @@ export function useProctor() {
     const fired = debouncer.current.update({
       NO_FACE: faceCount === 0,
       MULTIPLE_FACES: faceCount >= 2,
-      LOOKING_AWAY:
-        faceCount === 1 && gaze !== "center" && gaze !== "unknown",
+      LOOKING_AWAY: faceCount === 1 && offScreen,
       LIP_SYNC_MISMATCH: faceCount === 1 && voiceSustained && !mouthMoving,
       BACKGROUND_VOICE: faceCount === 0 && voiceSustained,
       PHONE_DETECTED: sig.phone,
@@ -165,6 +215,7 @@ export function useProctor() {
       objects: objects.map((o) => o.class),
       personCount,
       fps: fs.length,
+      calibrating,
     };
 
     rafRef.current = requestAnimationFrame(detectLoop);
@@ -219,6 +270,7 @@ export function useProctor() {
     classHistory.current = [];
     personHistory.current = [];
     objSignals.current = { phone: false, book: false, extraPerson: false };
+    baseline.current = { yaw: 0, pitch: 0, yawSum: 0, pitchSum: 0, n: 0, ready: false };
     metricsRef.current = EMPTY_METRICS;
 
     try {
